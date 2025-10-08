@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>일정 관리</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>일정 관리</h2>
+
+<label>기사: <select id="driverFilter"><option value="">전체</option></select></label>
+<label>차량: <select id="carFilter"><option value="">전체</option></select></label>
+
+<table id="scheduleTable">
+  <thead>
+    <tr>
+      <th>차량</th><th>기사</th><th>예약자</th><th>장소</th>
+      <th>시작일</th><th>종료일</th><th>휴가</th><th>작업</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h3>일정 추가/수정</h3>
+<form id="scheduleForm">
+  차량: <input name="차량" required>
+  기사: <input name="기사" required>
+  예약자: <input name="예약자" required>
+  장소: <input name="장소" required>
+  시작일: <input name="시작일" type="date" required>
+  종료일: <input name="종료일" type="date" required>
+  휴가: <select name="휴가여부"><option value="N">N</option><option value="Y">Y</option></select>
+  <button type="submit">추가/수정</button>
+</form>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxiZGEjRttgOuPhdZ9BFpIogf23jLXD16r8d5PgO3DE0j2CuU0FmwwWaeA4ZJKCDx8s/exec"; // 여기에 Apps Script URL 입력
+let schedules = [];
+
+async function fetchSchedules() {
+  const res = await fetch(`${SCRIPT_URL}?action=get`);
+  schedules = await res.json();
+  populateFilters();
+  renderTable();
+}
+
+function populateFilters() {
+  const driverSet = new Set();
+  const carSet = new Set();
+  schedules.forEach(s => { driverSet.add(s.기사); carSet.add(s.차량); });
+  const driverFilter = document.getElementById("driverFilter");
+  const carFilter = document.getElementById("carFilter");
+  driverFilter.innerHTML = '<option value="">전체</option>';
+  carFilter.innerHTML = '<option value="">전체</option>';
+  driverSet.forEach(d => driverFilter.innerHTML += `<option>${d}</option>`);
+  carSet.forEach(c => carFilter.innerHTML += `<option>${c}</option>`);
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#scheduleTable tbody");
+  tbody.innerHTML = "";
+  const driverVal = document.getElementById("driverFilter").value;
+  const carVal = document.getElementById("carFilter").value;
+  
+  schedules.forEach((row, idx) => {
+    if((!driverVal || row.기사 === driverVal) && (!carVal || row.차량 === carVal)){
+      const tr = document.createElement("tr");
+      if(row.휴가여부 === 'Y') tr.style.backgroundColor = "#f99";
+      tr.innerHTML = `
+        <td>${row.차량}</td><td>${row.기사}</td><td>${row.예약자}</td>
+        <td>${row.장소}</td><td>${row.시작일}</td><td>${row.종료일}</td>
+        <td>${row.휴가여부}</td>
+        <td><button onclick="deleteSchedule(${idx})">삭제</button></td>
+      `;
+      tbody.appendChild(tr);
+    }
+  });
+}
+
+async function deleteSchedule(idx) {
+  await fetch(`${SCRIPT_URL}?action=delete&index=${idx}`);
+  fetchSchedules();
+}
+
+document.getElementById("scheduleForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const params = {};
+  formData.forEach((v,k)=>params[k]=v);
+  const query = new URLSearchParams(params).toString();
+  await fetch(`${SCRIPT_URL}?action=add&${query}`);
+  e.target.reset();
+  fetchSchedules();
+});
+
+document.getElementById("driverFilter").addEventListener("change", renderTable);
+document.getElementById("carFilter").addEventListener("change", renderTable);
+
+fetchSchedules();
+</script>
+
+</body>
+</html>
